@@ -11,7 +11,10 @@
  *   2. The LAP memory MCP (local stdio) — when memory env is configured
  *      (LAP_BASE_URL + AGENT_ID + an access token). Exposes save_memory /
  *      search_memory, same tools the claude-agent-sdk harness gets.
- *   3. Every MCP server the harness's LiteLLM key can access — discovered via
+ *   3. The cron scheduler MCP (local stdio) — always active. Exposes
+ *      schedule_task / list_tasks / cancel_task / run_task_now so the agent
+ *      can schedule recurring or one-shot on-device tasks.
+ *   4. Every MCP server the harness's LiteLLM key can access — discovered via
  *      `${base}/v1/mcp/server` and wired as `remote` entries pointing at
  *      `${base}/mcp/<name>` with `Authorization: Bearer <key>` (same gateway +
  *      key + URL convention the platform's resolveAgentMcpServers uses).
@@ -127,6 +130,20 @@ if (issueBase && issueAccess) {
     },
   };
 }
+
+// --- Cron scheduler MCP (local) — always active ---
+// No special env var required. Persists task state to CRON_STORE_PATH
+// (default /tmp/lap-cron-tasks.json). Exposes schedule_task / list_tasks /
+// cancel_task / run_task_now so the agent can schedule on-device work.
+out["cron-scheduler"] = {
+  type: "local",
+  command: ["node", `${MCP_DIR}/cron-scheduler-mcp.mjs`],
+  enabled: true,
+  environment: {
+    ...(process.env.CRON_STORE_PATH      && { CRON_STORE_PATH:      process.env.CRON_STORE_PATH }),
+    ...(process.env.CRON_TASK_TIMEOUT_MS && { CRON_TASK_TIMEOUT_MS: process.env.CRON_TASK_TIMEOUT_MS }),
+  },
+};
 
 // --- LiteLLM gateway MCP servers (remote) ---
 const rawBase = process.env.LITELLM_API_BASE || "";
